@@ -1,0 +1,57 @@
+-- CPI-IW Seed Data
+-- CPI-IW General Index, Base 2016=100
+-- Source: Labour Bureau Press Releases
+
+INSERT INTO indices (type, year, month, value, source) VALUES
+-- 2022
+('CPI-IW', 2022, 1, 125.1, 'Labour Bureau'),
+('CPI-IW', 2022, 2, 125.0, 'Labour Bureau'),
+('CPI-IW', 2022, 3, 126.0, 'Labour Bureau'),
+('CPI-IW', 2022, 4, 127.7, 'Labour Bureau'),
+('CPI-IW', 2022, 5, 129.0, 'Labour Bureau'),
+('CPI-IW', 2022, 6, 129.2, 'Labour Bureau'),
+('CPI-IW', 2022, 7, 129.9, 'Labour Bureau'),
+('CPI-IW', 2022, 8, 130.2, 'Labour Bureau'),
+('CPI-IW', 2022, 9, 131.3, 'Labour Bureau'),
+('CPI-IW', 2022, 10, 132.5, 'Labour Bureau'),
+('CPI-IW', 2022, 11, 132.5, 'Labour Bureau'),
+('CPI-IW', 2022, 12, 132.3, 'Labour Bureau'),
+-- 2023
+('CPI-IW', 2023, 1, 132.8, 'Labour Bureau'),
+('CPI-IW', 2023, 2, 132.7, 'Labour Bureau'),
+('CPI-IW', 2023, 3, 133.3, 'Labour Bureau'),
+('CPI-IW', 2023, 4, 134.2, 'Labour Bureau'),
+('CPI-IW', 2023, 5, 134.7, 'Labour Bureau'),
+('CPI-IW', 2023, 6, 136.4, 'Labour Bureau'),
+('CPI-IW', 2023, 7, 139.7, 'Labour Bureau'),
+('CPI-IW', 2023, 8, 139.2, 'Labour Bureau'),
+('CPI-IW', 2023, 9, 137.5, 'Labour Bureau'),
+('CPI-IW', 2023, 10, 138.4, 'Labour Bureau'),
+('CPI-IW', 2023, 11, 139.1, 'Labour Bureau'),
+('CPI-IW', 2023, 12, 138.8, 'Labour Bureau'),
+-- 2024
+('CPI-IW', 2024, 1, 138.9, 'Labour Bureau'),
+('CPI-IW', 2024, 2, 139.2, 'Labour Bureau'),
+('CPI-IW', 2024, 3, 138.9, 'Labour Bureau'),
+('CPI-IW', 2024, 4, 139.4, 'Labour Bureau'),
+('CPI-IW', 2024, 5, 139.9, 'Labour Bureau'),
+('CPI-IW', 2024, 6, 141.4, 'Labour Bureau'),
+('CPI-IW', 2024, 7, 142.7, 'Labour Bureau'),
+('CPI-IW', 2024, 8, 142.6, 'Labour Bureau'),
+('CPI-IW', 2024, 9, 143.3, 'Labour Bureau'),
+('CPI-IW', 2024, 10, 144.5, 'Labour Bureau'),
+('CPI-IW', 2024, 11, 144.5, 'Labour Bureau'),
+('CPI-IW', 2024, 12, 143.7, 'Labour Bureau'),
+-- 2025 (May-Sep: OCR-extracted, Oct-Dec: Verified from press release)
+('CPI-IW', 2025, 1, 143.2, 'Labour Bureau'),
+('CPI-IW', 2025, 2, 142.8, 'Labour Bureau'),
+('CPI-IW', 2025, 3, 143.0, 'Labour Bureau'),
+('CPI-IW', 2025, 4, 143.5, 'Labour Bureau'),
+('CPI-IW', 2025, 5, 144.0, 'Labour Bureau'),
+('CPI-IW', 2025, 6, 145.0, 'Labour Bureau'),
+('CPI-IW', 2025, 7, 146.5, 'Labour Bureau'),
+('CPI-IW', 2025, 8, 147.1, 'Labour Bureau'),
+('CPI-IW', 2025, 9, 147.3, 'Labour Bureau'),
+('CPI-IW', 2025, 10, 147.7, 'Labour Bureau'),
+('CPI-IW', 2025, 11, 148.2, 'Labour Bureau'),
+('CPI-IW', 2025, 12, 148.2, 'Labour Bureau');
