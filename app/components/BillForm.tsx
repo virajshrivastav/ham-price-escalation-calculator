@@ -9,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { CalendarIcon, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { CalendarIcon, Loader2, AlertTriangle, CheckCircle2, Zap, Database } from 'lucide-react';
 import { format } from 'date-fns';
 import { getHAMCurrentMonth, formatMonthDisplay, parseMonthString } from '@/lib/formulas/base-month';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ interface BillFormProps {
 
 export interface IndexData {
     value: number;
+    source: 'cache' | 'mcp' | 'seed';
     isEstimate: boolean;
     estimateSource?: string;
 }
@@ -156,20 +157,47 @@ export function BillForm({ contract, onComplete, onBack }: BillFormProps) {
 
     const IndexBadge = ({ data, label }: { data: IndexData | null; label: string }) => {
         if (!data) return null;
-        return (
-            <div className="flex items-center gap-2">
-                <span className="font-mono text-lg">{data.value.toFixed(1)}</span>
-                {data.isEstimate ? (
+
+        const getBadge = () => {
+            if (data.isEstimate) {
+                return (
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
                         <AlertTriangle className="w-3 h-3 mr-1" />
                         Estimated
                     </Badge>
-                ) : (
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                        <CheckCircle2 className="w-3 h-3 mr-1" />
-                        Official
-                    </Badge>
-                )}
+                );
+            }
+
+            switch (data.source) {
+                case 'mcp':
+                    return (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                            <Zap className="w-3 h-3 mr-1" />
+                            Live
+                        </Badge>
+                    );
+                case 'seed':
+                    return (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Official
+                        </Badge>
+                    );
+                case 'cache':
+                default:
+                    return (
+                        <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-300">
+                            <Database className="w-3 h-3 mr-1" />
+                            Cached
+                        </Badge>
+                    );
+            }
+        };
+
+        return (
+            <div className="flex items-center gap-2">
+                <span className="font-mono text-lg">{data.value.toFixed(1)}</span>
+                {getBadge()}
             </div>
         );
     };
