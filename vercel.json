@@ -2,10 +2,5 @@
     "buildCommand": "npm run build",
     "installCommand": "npm install",
     "framework": "nextjs",
-    "outputDirectory": ".next",
-    "env": {
-        "TURSO_DATABASE_URL": "@turso_database_url",
-        "TURSO_AUTH_TOKEN": "@turso_auth_token",
-        "MCP_URL": "optional"
-    }
+    "outputDirectory": ".next"
 }
