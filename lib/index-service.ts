@@ -2,8 +2,8 @@
  * Index Service
  * 
  * Cache-first strategy for fetching WPI and CPI-IW indices.
- * - Check database cache first
- * - For WPI: fetch from MCP if cache miss, then cache
+ * - Check database cache first (with 24h TTL for MCP-cached data)
+ * - For WPI: fetch from MCP if cache miss or stale, then cache
  * - For CPI-IW: return from seed or throw if not available
  */
 
@@ -12,17 +12,29 @@ import { indices } from '@/db/schema';
 import { fetchWPI } from '@/lib/mcp-client';
 import { eq, and } from 'drizzle-orm';
 
+// Cache TTL: 24 hours in milliseconds
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 export interface IndexResult {
     value: number;
     source: 'cache' | 'mcp' | 'seed';
     isEstimate: boolean;
+    isStale?: boolean; // True if data is older than TTL
     estimateSource?: string; // Month used if estimate
+}
+
+/**
+ * Check if a cached record is stale (older than TTL)
+ */
+function isCacheStale(createdAt: Date | null): boolean {
+    if (!createdAt) return false;
+    return Date.now() - createdAt.getTime() > CACHE_TTL_MS;
 }
 
 /**
  * Get WPI for a specific month
  * Multi-tier fallback strategy:
- * 1. Check database cache
+ * 1. Check database cache (refresh if stale MCP data)
  * 2. Try MCP with 5s timeout
  * 3. Use cached seed data
  * 4. Return most recent WPI as estimate
@@ -43,9 +55,48 @@ export async function getWPI(year: number, month: number): Promise<IndexResult |
 
     if (cached.length > 0) {
         const record = cached[0];
+        const isMcpCached = record.source === 'MoSPI MCP';
+        const stale = isMcpCached && isCacheStale(record.createdAt);
+
+        // If MCP-cached data is stale, try to refresh
+        if (stale) {
+            try {
+                const freshValue = await Promise.race([
+                    fetchWPI(year, month),
+                    new Promise<null>((_, reject) =>
+                        setTimeout(() => reject(new Error('MCP timeout')), 5000)
+                    )
+                ]);
+
+                if (freshValue !== null) {
+                    // Update cache with fresh data
+                    await db.update(indices)
+                        .set({ value: freshValue, createdAt: new Date() })
+                        .where(eq(indices.id, record.id));
+
+                    return {
+                        value: freshValue,
+                        source: 'mcp',
+                        isEstimate: false,
+                    };
+                }
+            } catch {
+                // MCP failed, return stale data with flag
+                console.warn(`[WPI] MCP refresh failed for ${year}-${month}, using stale cache`);
+            }
+
+            return {
+                value: record.value,
+                source: 'cache',
+                isEstimate: false,
+                isStale: true,
+            };
+        }
+
+        // Fresh cache hit
         return {
             value: record.value,
-            source: record.source === 'MoSPI MCP' ? 'mcp' : 'cache',
+            source: isMcpCached ? 'mcp' : 'cache',
             isEstimate: false,
         };
     }

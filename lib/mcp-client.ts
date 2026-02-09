@@ -12,8 +12,50 @@
 
 const MCP_URL = process.env.MCP_URL || 'http://localhost:8000/mcp';
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff
+
 let sessionId: string | null = null;
 let requestId = 0;
+
+/**
+ * Sleep utility for retry delays
+ */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Retry wrapper with exponential backoff
+ * Only retries on network errors, not on 4xx responses
+ */
+async function withRetry<T>(
+    fn: () => Promise<T>,
+    context: string
+): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+
+            // Don't retry on 4xx errors (client errors)
+            if (lastError.message.includes('4')) {
+                throw lastError;
+            }
+
+            if (attempt < MAX_RETRIES - 1) {
+                const delay = RETRY_DELAYS[attempt];
+                console.warn(`[MCP] ${context} failed (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms...`);
+                await sleep(delay);
+                resetSession(); // Reset session on retry
+            }
+        }
+    }
+
+    throw lastError;
+}
 
 /**
  * Initialize MCP session
@@ -85,99 +127,100 @@ export function resetSession(): void {
  */
 export async function fetchWPI(year: number, month: number): Promise<number | null> {
     try {
-        await initializeSession();
+        return await withRetry(async () => {
+            await initializeSession();
 
-        const response = await fetch(MCP_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json, text/event-stream',
-                'Mcp-Session-Id': sessionId!,
-            },
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: ++requestId,
-                method: 'tools/call',
-                params: {
-                    name: '4_get_data',
-                    arguments: {
-                        dataset: 'WPI',
-                        filters: {
-                            year: year.toString(),
-                            month_code: month.toString(),
-                            major_group_code: '1000000000', // All Commodities
+            const response = await fetch(MCP_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, text/event-stream',
+                    'Mcp-Session-Id': sessionId!,
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: ++requestId,
+                    method: 'tools/call',
+                    params: {
+                        name: '4_get_data',
+                        arguments: {
+                            dataset: 'WPI',
+                            filters: {
+                                year: year.toString(),
+                                month_code: month.toString(),
+                                major_group_code: '1000000000', // All Commodities
+                            },
                         },
                     },
-                },
-            }),
-        });
+                }),
+            });
 
-        if (!response.ok) {
-            console.error(`[MCP] Request failed: ${response.status}`);
-            return null;
-        }
+            if (!response.ok) {
+                throw new Error(`MCP request failed: ${response.status}`);
+            }
 
-        // FastMCP 3.0 returns SSE format: "event: message\r\ndata: {...}\r\n\r\n"
-        const text = await response.text();
-        const lines = text.split(/\r?\n/);
-        const dataLine = lines.find(l => l.startsWith('data: '));
+            // FastMCP 3.0 returns SSE format: "event: message\r\ndata: {...}\r\n\r\n"
+            const text = await response.text();
+            const lines = text.split(/\r?\n/);
+            const dataLine = lines.find(l => l.startsWith('data: '));
 
-        let data: Record<string, unknown>;
+            let data: Record<string, unknown>;
 
-        if (dataLine) {
-            const jsonStr = dataLine.slice(6).trim();
-            data = JSON.parse(jsonStr);
-        } else {
-            console.error('[MCP] No data line in SSE response');
-            return null;
-        }
+            if (dataLine) {
+                const jsonStr = dataLine.slice(6).trim();
+                data = JSON.parse(jsonStr);
+            } else {
+                throw new Error('No data line in SSE response');
+            }
 
-        // Check for JSON-RPC error
-        if (data.error) {
-            console.error('[MCP] JSON-RPC error:', data.error);
-            return null;
-        }
-
-        if (!data.result) {
-            return null;
-        }
-
-        const result = data.result as Record<string, unknown>;
-
-        // Check for isError flag
-        if (result.isError) {
-            console.error('[MCP] Tool returned error');
-            return null;
-        }
-
-        // Parse content array (standard MCP format)
-        if (result.content && Array.isArray(result.content) && result.content.length > 0) {
-            const content = result.content as Array<{ type?: string; text?: string }>;
-            const textContent = content[0].text;
-
-            if (!textContent) {
+            // Check for JSON-RPC error
+            if (data.error) {
+                console.error('[MCP] JSON-RPC error:', data.error);
                 return null;
             }
 
-            const innerJson = JSON.parse(textContent);
-
-            if (!innerJson.statusCode || !innerJson.data?.length) {
+            if (!data.result) {
                 return null;
             }
 
-            return parseFloat(innerJson.data[0].index_value);
-        }
+            const result = data.result as Record<string, unknown>;
 
-        // Fallback: result might contain data directly
-        if (result.data && Array.isArray(result.data)) {
-            const directData = result.data as Array<{ index_value?: string }>;
-            return parseFloat(directData[0]?.index_value || '');
-        }
+            // Check for isError flag
+            if (result.isError) {
+                console.error('[MCP] Tool returned error');
+                return null;
+            }
 
-        return null;
+            // Parse content array (standard MCP format)
+            if (result.content && Array.isArray(result.content) && result.content.length > 0) {
+                const content = result.content as Array<{ type?: string; text?: string }>;
+                const textContent = content[0].text;
+
+                if (!textContent) {
+                    return null;
+                }
+
+                const innerJson = JSON.parse(textContent);
+
+                if (!innerJson.statusCode || !innerJson.data?.length) {
+                    return null;
+                }
+
+                return parseFloat(innerJson.data[0].index_value);
+            }
+
+            // Fallback: result might contain data directly
+            if (result.data && Array.isArray(result.data)) {
+                const directData = result.data as Array<{ index_value?: string }>;
+                return parseFloat(directData[0]?.index_value || '');
+            }
+
+            return null;
+        }, `fetchWPI(${year}-${month})`);
     } catch (error) {
-        console.error('[MCP] Fetch error:', error);
+        console.error('[MCP] Fetch error after retries:', error);
         resetSession();
         return null;
     }
 }
+
